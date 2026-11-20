@@ -24,7 +24,8 @@ const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
 // Sanity-check the guide's data before handing anything in: the official list has 55
 // trophies (1 platinum, 2 gold, 6 silver, 46 bronze), and the gate refuses the entry
-// unless every one is present with a cited step-by-step guide of its own.
+// unless every one is present with a non-blank guide of its own — so each trophy must
+// carry its restored `guide` text AND the cited step-by-step guide built on top of it.
 function checkTrophyData() {
   const data = JSON.parse(readFileSync(join(here, 'app', 'data', 'trophies.json'), 'utf8'));
   const trophies = Array.isArray(data) ? data : data.trophies;
@@ -35,6 +36,9 @@ function checkTrophyData() {
   for (const trophy of trophies) {
     if (typeof trophy.name !== 'string' || trophy.name.trim() === '') {
       throw new Error(`${APP_TITLE}: a trophy has no name`);
+    }
+    if (typeof trophy.guide !== 'string' || trophy.guide.trim() === '') {
+      throw new Error(`${APP_TITLE}: trophy "${trophy.name}" has no guide`);
     }
     const steps = Array.isArray(trophy.steps) ? trophy.steps : [];
     if (steps.length === 0 || steps.some((step) => typeof step?.text !== 'string' || step.text.trim() === '')) {
