@@ -4,13 +4,15 @@
 // localStorage, wires the controls, and renders through views.js. It also reads
 // the ?shot= scenes that shots.json names, so the maker's screenshots can be
 // taken of exact states: ?earned=2,3,17 seeds earned trophies,
-// ?counters=17:23,25:5 seeds counters, ?open=25 opens a guide, ?spoiler=1 turns
+// ?counters=17:23,25:5 seeds counters, ?open=28 opens a guide, ?spoiler=1 turns
 // spoiler mode on, ?cat=watch picks a filter and ?view=roadmap or ?view=matrix
-// opens that view. A normal visit uses none of them.
+// opens that view. A normal visit uses none of them, and the ledger opens on
+// the meditation guide — the richest guide on the list, with its counter, its
+// possibly-missable flag and its unconfirmed total all visible at once.
 
 import {
-  renderProgress, renderAudit, renderChips, renderNextUp, renderList,
-  renderDetail, renderSourcesPanel, renderRoadmap, renderMatrix, nextUp,
+  renderProgress, renderAudit, renderChips, renderList,
+  renderDetail, renderSidePanel, renderRoadmap, renderMatrix,
 } from './views.js';
 
 const EARNED_KEY = 'leonida-trophy-guide:earned';
@@ -58,6 +60,7 @@ const state = {
   grade: 'all',
   query: '',
   hideEarned: false,
+  notEarned: false,
   spoiler: localStorage.getItem(SPOILER_KEY) === '1',
   selectedId: null,
   view: 'ledger',
@@ -76,15 +79,13 @@ if (params.has('counters')) {
   state.counters = clampCounters(seeded);
 }
 if (params.has('spoiler')) state.spoiler = params.get('spoiler') === '1';
+if (params.has('notearned')) state.notEarned = params.get('notearned') === '1';
 if (params.has('cat')) state.category = params.get('cat');
 if (params.get('view') === 'roadmap' || params.get('view') === 'matrix') state.view = params.get('view');
 // The ledger opens with a guide already open: the shot's ?open= choice, else the
-// next trophy the roadmap asks for.
+// meditation guide (id 28) — the list's richest single guide.
 if (params.has('open')) state.selectedId = Number(params.get('open'));
-if (state.selectedId === null) {
-  const up = nextUp(doc, state.earned);
-  state.selectedId = up ? up.id : null;
-}
+if (state.selectedId === null) state.selectedId = 28;
 
 const handlers = {
   onToggle(id) {
@@ -112,6 +113,10 @@ const handlers = {
     render();
     document.querySelector('#detail').scrollIntoView({ block: 'nearest' });
   },
+  onView(view) {
+    state.view = view;
+    render();
+  },
 };
 
 function saveProgress() {
@@ -130,12 +135,14 @@ function render() {
   document.querySelector('#tab-roadmap').classList.toggle('active', state.view === 'roadmap');
   document.querySelector('#tab-matrix').classList.toggle('active', state.view === 'matrix');
   document.querySelector('#spoiler-mode').checked = state.spoiler;
+  const notEarnedChip = document.querySelector('#not-earned');
+  notEarnedChip.classList.toggle('active', state.notEarned);
+  notEarnedChip.setAttribute('aria-pressed', state.notEarned ? 'true' : 'false');
   if (state.view === 'ledger') {
     renderChips(doc, state, document);
-    renderNextUp(doc, state, handlers, document);
     renderList(doc, state, handlers, document);
     renderDetail(doc, state, handlers, document);
-    renderSourcesPanel(doc, document);
+    renderSidePanel(doc, state, handlers, document);
   } else if (state.view === 'roadmap') {
     renderRoadmap(doc, state, handlers, document);
   } else {
@@ -159,6 +166,10 @@ document.querySelector('#grade-filter').addEventListener('change', (e) => {
 });
 document.querySelector('#hide-earned').addEventListener('change', (e) => {
   state.hideEarned = e.target.checked;
+  render();
+});
+document.querySelector('#not-earned').addEventListener('click', () => {
+  state.notEarned = !state.notEarned;
   render();
 });
 document.querySelector('#spoiler-mode').addEventListener('change', (e) => {

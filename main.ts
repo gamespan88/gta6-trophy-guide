@@ -26,6 +26,9 @@ const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 // trophies (1 platinum, 2 gold, 6 silver, 46 bronze), and the gate refuses the entry
 // unless every one is present with a non-blank guide of its own — so each trophy must
 // carry its restored `guide` text AND the cited step-by-step guide built on top of it.
+// Every official field must be present, too: a trophy missing its name, description,
+// grade or category is not the official list any more, so the hand-in refuses it here
+// rather than letting the gate find it.
 function checkTrophyData() {
   const data = JSON.parse(readFileSync(join(here, 'app', 'data', 'trophies.json'), 'utf8'));
   const trophies = Array.isArray(data) ? data : data.trophies;
@@ -36,6 +39,15 @@ function checkTrophyData() {
   for (const trophy of trophies) {
     if (typeof trophy.name !== 'string' || trophy.name.trim() === '') {
       throw new Error(`${APP_TITLE}: a trophy has no name`);
+    }
+    if (typeof trophy.description !== 'string' || trophy.description.trim() === '') {
+      throw new Error(`${APP_TITLE}: trophy "${trophy.name}" has no official description`);
+    }
+    if (typeof trophy.grade !== 'string' || !(trophy.grade in EXPECTED_GRADES)) {
+      throw new Error(`${APP_TITLE}: trophy "${trophy.name}" has no official grade`);
+    }
+    if (typeof trophy.category !== 'string' || trophy.category.trim() === '') {
+      throw new Error(`${APP_TITLE}: trophy "${trophy.name}" has no category`);
     }
     if (typeof trophy.guide !== 'string' || trophy.guide.trim() === '') {
       throw new Error(`${APP_TITLE}: trophy "${trophy.name}" has no guide`);
