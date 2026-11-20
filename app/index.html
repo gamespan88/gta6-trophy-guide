@@ -3,47 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leonida Trophy Guide — GTA VI trophy tracker, roadmap and guides</title>
+<title>Leonida Trophy Guide — GTA VI trophy tracker, roadmap and cited guides</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="masthead">
-  <svg class="palms" viewBox="0 0 1200 190" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-    <g fill="#1b0f38">
-      <path d="M96 190 C100 130 98 96 84 62 C104 84 128 92 152 90 C132 76 122 62 118 40 C134 58 154 66 176 64 C154 52 142 34 140 12 C152 34 168 46 188 50 C166 28 132 26 108 44 C100 30 88 22 72 20 C88 34 94 48 92 66 C76 50 56 44 38 48 C60 56 74 70 80 88 C84 118 86 152 88 190 Z"/>
-      <path d="M1064 190 C1067 142 1066 112 1056 84 C1072 100 1090 106 1108 105 C1092 94 1084 82 1081 64 C1094 78 1109 84 1126 83 C1109 73 1099 59 1097 42 C1107 59 1120 68 1135 71 C1118 54 1092 52 1073 65 C1067 54 1057 48 1045 46 C1057 57 1062 68 1060 81 C1048 69 1033 64 1019 67 C1036 73 1047 84 1051 97 C1054 122 1055 154 1056 190 Z"/>
-      <rect x="0" y="182" width="1200" height="8"/>
-    </g>
-  </svg>
-  <div class="masthead-text">
+<header class="topbar">
+  <div class="title-block">
     <p class="kicker">Grand Theft Auto VI · PlayStation 5 · Offline guide &amp; tracker</p>
     <h1>Leonida Trophy Guide</h1>
-    <p class="tagline">All 55 official trophies: a tracker that saves your progress, a roadmap to the platinum, every missable flagged, and a guide to each trophy that cites its sources.</p>
+    <p class="tagline">All 55 official trophies — a tracker, a roadmap to the platinum, and a numbered guide to each trophy that cites its sources.</p>
   </div>
   <div class="progress-card">
     <div class="progress-line"><strong id="progress-count">0 of 55 earned</strong><span id="progress-pct">0%</span></div>
     <div class="progress-bar"><div id="progress-fill"></div></div>
     <ul class="grade-counts" id="grade-counts"></ul>
+    <p class="saved-note">Saved in this browser — nothing leaves this page.</p>
+  </div>
+  <div class="header-actions">
+    <label class="toggle"><input id="spoiler-mode" type="checkbox"> Spoiler mode: hide story trophies until earned</label>
+    <div class="header-buttons">
+      <button id="export-btn" type="button">Export progress</button>
+      <label class="import-btn">Import progress<input id="import-file" type="file" accept="application/json" hidden></label>
+    </div>
   </div>
 </header>
 
+<div id="audit-strip" class="audit-strip" role="note"></div>
+
 <nav class="view-tabs" aria-label="Views">
-  <button id="tab-tracker" class="tab active" type="button">Tracker &amp; guides</button>
-  <button id="tab-roadmap" class="tab" type="button">Roadmap to the platinum</button>
+  <button id="tab-ledger" class="tab active" type="button">Ledger</button>
+  <button id="tab-roadmap" class="tab" type="button">Roadmap</button>
+  <button id="tab-matrix" class="tab" type="button">Source matrix</button>
 </nav>
 
 <main>
-  <section id="view-tracker">
+  <noscript><p class="noscript-note">This guide is an interactive tracker and needs JavaScript to show the trophy list, the guides and your saved progress. Everything runs locally in your browser; nothing is fetched.</p></noscript>
+  <section id="view-ledger">
     <div class="controls">
       <input id="search" type="search" placeholder="Search trophies…" aria-label="Search trophies">
-      <div class="chips" id="category-chips" role="group" aria-label="Filter by kind">
-        <button type="button" class="chip active" data-cat="all">All</button>
-        <button type="button" class="chip" data-cat="story">Story</button>
-        <button type="button" class="chip" data-cat="missable">Missable</button>
-        <button type="button" class="chip" data-cat="collectibles">Collectibles</button>
-        <button type="button" class="chip" data-cat="activities">Activities</button>
-        <button type="button" class="chip" data-cat="misc">Feats &amp; misc</button>
-      </div>
+      <div class="chips" id="category-chips" role="group" aria-label="Filter by kind"></div>
       <label class="select-label">Grade
         <select id="grade-filter">
           <option value="all">All grades</option>
@@ -54,28 +52,35 @@
         </select>
       </label>
       <label class="toggle"><input id="hide-earned" type="checkbox"> Hide earned</label>
-      <label class="toggle"><input id="spoiler-mode" type="checkbox"> Spoiler mode: hide story trophies until earned</label>
-      <span class="spacer"></span>
-      <button id="export-btn" type="button">Export progress</button>
-      <label class="import-btn">Import progress<input id="import-file" type="file" accept="application/json" hidden></label>
     </div>
-    <p class="result-line" id="result-line"></p>
-    <div class="split">
-      <ol id="trophy-list" class="trophy-list"></ol>
+    <p class="next-up" id="next-up"></p>
+    <div class="panes">
+      <div class="pane-list">
+        <p class="result-line" id="result-line"></p>
+        <ol id="trophy-list" class="trophy-list"></ol>
+      </div>
       <aside id="detail" class="detail" aria-label="Trophy guide"></aside>
+      <aside id="sources-panel" class="sources-panel" aria-label="Sources"></aside>
     </div>
   </section>
 
   <section id="view-roadmap" hidden>
-    <p class="roadmap-intro">Eight phases, in the order this guide recommends earning them: the story and its missable stranger strands first, the repeatable clean-up after. Missable trophies are flagged in place — finish those phases before the story moves past them. Tick trophies off in the tracker; this roadmap reads the same saved progress.</p>
+    <p class="roadmap-intro">Eight stages, in the order this guide recommends earning them: the story and its watch-flagged stranger strands first, the repeatable clean-up after. Tick trophies off in the ledger; this roadmap reads the same saved progress.</p>
+    <div id="stage-chips" class="stage-chips"></div>
+    <div id="missable-watch"></div>
     <div id="roadmap"></div>
+  </section>
+
+  <section id="view-matrix" hidden>
+    <p class="matrix-intro">Every source this guide cites, and the trophies that cite it. Citation numbers in the guides refer to this list; the counts are computed from the trophy data itself, so the matrix and the audit strip can never disagree.</p>
+    <div id="source-matrix"></div>
   </section>
 </main>
 
 <footer>
-  <p><strong>Sources.</strong> Trophy names, descriptions and grades are the official PlayStation 5 list, as published on Exophase; tracked counts (42 Shooting Range challenges, 14 drone-race locations, 18 meditation spots, 52 areas, 9 gangs, 8 garages, choices to 500) are the same list's counts as published on Exophase and PSNProfiles. Every guide below is written for this page from those descriptions, and each trophy's own source line says so.</p>
-  <p><strong>Missable rule.</strong> <span id="missable-rule"></span></p>
-  <p class="fineprint">Leonida Trophy Guide is a fan-made tool. It is not affiliated with Rockstar Games or PlayStation, carries no official artwork, and works entirely offline: progress lives in your browser's local storage and nowhere else.</p>
+  <p><strong>Sources.</strong> <span id="footer-sources"></span></p>
+  <p><strong>Watch rule.</strong> <span id="missable-rule"></span></p>
+  <p class="fineprint">Leonida Trophy Guide is a fan-made tool. It is not affiliated with Rockstar Games or PlayStation, carries no official artwork, and works entirely offline: progress lives in your browser's local storage and nowhere else. Source addresses are printed as text for reference; the page itself loads nothing from anywhere.</p>
 </footer>
 
 <script type="module" src="app.js"></script>

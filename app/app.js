@@ -1,16 +1,20 @@
 // Leonida Trophy Guide — app entry point.
-// Loads the trophy data, owns the UI state (earned set, filters, spoiler mode, the open
-// guide), persists progress to localStorage, wires the controls, and renders through
-// views.js. It also reads the ?shot= scenes that shots.json names, so the maker's
-// screenshots can be taken of exact states: ?earned=2,3,17 seeds earned trophies,
-// ?open=17 opens a guide, ?spoiler=1 turns spoiler mode on, ?cat=missable picks a
-// filter and ?view=roadmap opens the roadmap. A normal visit uses none of them.
+// Loads the trophy data, owns the UI state (earned set, per-trophy counters,
+// filters, spoiler mode, the open guide, the current view), persists progress to
+// localStorage, wires the controls, and renders through views.js. It also reads
+// the ?shot= scenes that shots.json names, so the maker's screenshots can be
+// taken of exact states: ?earned=2,3,17 seeds earned trophies,
+// ?counters=17:23,25:5 seeds counters, ?open=25 opens a guide, ?spoiler=1 turns
+// spoiler mode on, ?cat=watch picks a filter and ?view=roadmap or ?view=matrix
+// opens that view. A normal visit uses none of them.
 
 import {
-  renderProgress, renderList, renderDetail, renderRoadmap,
+  renderProgress, renderAudit, renderChips, renderNextUp, renderList,
+  renderDetail, renderSourcesPanel, renderRoadmap, renderMatrix, nextUp,
 } from './views.js';
 
 const EARNED_KEY = 'leonida-trophy-guide:earned';
+const COUNTERS_KEY = 'leonida-trophy-guide:counters';
 const SPOILER_KEY = 'leonida-trophy-guide:spoiler';
 
 const doc = await (await fetch('data/trophies.json')).json();
@@ -24,25 +28,63 @@ function loadEarned() {
   }
 }
 
+function loadCounters() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(COUNTERS_KEY) ?? '{}');
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// A counter can never pass its trophy's total or drop below zero, however the
+// value arrived — seeded by a screenshot scene, typed into an import file, or
+// restored from storage written by an older version.
+function clampCounters(counters) {
+  const out = {};
+  for (const trophy of doc.trophies) {
+    const raw = Number(counters[trophy.id]);
+    if (!Number.isFinite(raw)) continue;
+    const max = trophy.counter?.total ?? Number.POSITIVE_INFINITY;
+    out[trophy.id] = Math.min(max, Math.max(0, Math.floor(raw)));
+  }
+  return out;
+}
+
 const state = {
   earned: loadEarned(),
+  counters: clampCounters(loadCounters()),
   category: 'all',
   grade: 'all',
   query: '',
   hideEarned: false,
   spoiler: localStorage.getItem(SPOILER_KEY) === '1',
   selectedId: null,
-  view: 'tracker',
+  view: 'ledger',
 };
 
 // Screenshot scenes seed their state from the query string instead of localStorage.
 if (params.has('earned')) {
   state.earned = new Set(params.get('earned').split(',').map(Number).filter((n) => n > 0));
 }
+if (params.has('counters')) {
+  const seeded = {};
+  for (const pair of params.get('counters').split(',')) {
+    const [id, value] = pair.split(':').map(Number);
+    if (id > 0) seeded[id] = value || 0;
+  }
+  state.counters = clampCounters(seeded);
+}
 if (params.has('spoiler')) state.spoiler = params.get('spoiler') === '1';
-if (params.has('open')) state.selectedId = Number(params.get('open'));
 if (params.has('cat')) state.category = params.get('cat');
-if (params.get('view') === 'roadmap') state.view = 'roadmap';
+if (params.get('view') === 'roadmap' || params.get('view') === 'matrix') state.view = params.get('view');
+// The ledger opens with a guide already open: the shot's ?open= choice, else the
+// next trophy the roadmap asks for.
+if (params.has('open')) state.selectedId = Number(params.get('open'));
+if (state.selectedId === null) {
+  const up = nextUp(doc, state.earned);
+  state.selectedId = up ? up.id : null;
+}
 
 const handlers = {
   onToggle(id) {
@@ -55,8 +97,16 @@ const handlers = {
     state.selectedId = id;
     render();
   },
+  onCounter(id, delta) {
+    const trophy = doc.trophies.find((t) => t.id === id);
+    const max = trophy?.counter?.total ?? Number.POSITIVE_INFINITY;
+    const next = Math.min(max, Math.max(0, (state.counters[id] ?? 0) + delta));
+    state.counters[id] = next;
+    saveProgress();
+    render();
+  },
   onJump(id) {
-    state.view = 'tracker';
+    state.view = 'ledger';
     state.category = 'all';
     state.selectedId = id;
     render();
@@ -66,24 +116,30 @@ const handlers = {
 
 function saveProgress() {
   localStorage.setItem(EARNED_KEY, JSON.stringify([...state.earned]));
+  localStorage.setItem(COUNTERS_KEY, JSON.stringify(state.counters));
   localStorage.setItem(SPOILER_KEY, state.spoiler ? '1' : '0');
 }
 
 function render() {
   renderProgress(doc, state.earned, document);
-  document.querySelector('#view-tracker').hidden = state.view !== 'tracker';
+  renderAudit(doc, document);
+  document.querySelector('#view-ledger').hidden = state.view !== 'ledger';
   document.querySelector('#view-roadmap').hidden = state.view !== 'roadmap';
-  document.querySelector('#tab-tracker').classList.toggle('active', state.view === 'tracker');
+  document.querySelector('#view-matrix').hidden = state.view !== 'matrix';
+  document.querySelector('#tab-ledger').classList.toggle('active', state.view === 'ledger');
   document.querySelector('#tab-roadmap').classList.toggle('active', state.view === 'roadmap');
-  document.querySelectorAll('#category-chips .chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.cat === state.category);
-  });
+  document.querySelector('#tab-matrix').classList.toggle('active', state.view === 'matrix');
   document.querySelector('#spoiler-mode').checked = state.spoiler;
-  if (state.view === 'tracker') {
+  if (state.view === 'ledger') {
+    renderChips(doc, state, document);
+    renderNextUp(doc, state, handlers, document);
     renderList(doc, state, handlers, document);
     renderDetail(doc, state, handlers, document);
-  } else {
+    renderSourcesPanel(doc, document);
+  } else if (state.view === 'roadmap') {
     renderRoadmap(doc, state, handlers, document);
+  } else {
+    renderMatrix(doc, state, handlers, document);
   }
 }
 
@@ -110,18 +166,17 @@ document.querySelector('#spoiler-mode').addEventListener('change', (e) => {
   saveProgress();
   render();
 });
-document.querySelector('#tab-tracker').addEventListener('click', () => {
-  state.view = 'tracker';
-  render();
-});
-document.querySelector('#tab-roadmap').addEventListener('click', () => {
-  state.view = 'roadmap';
-  render();
-});
+for (const [tab, view] of [['#tab-ledger', 'ledger'], ['#tab-roadmap', 'roadmap'], ['#tab-matrix', 'matrix']]) {
+  document.querySelector(tab).addEventListener('click', () => {
+    state.view = view;
+    render();
+  });
+}
 document.querySelector('#export-btn').addEventListener('click', () => {
   const payload = JSON.stringify({
     app: 'leonida-trophy-guide',
     earned: [...state.earned].sort((a, b) => a - b),
+    counters: state.counters,
   }, null, 2);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
@@ -137,6 +192,9 @@ document.querySelector('#import-file').addEventListener('change', async (e) => {
     const ids = Array.isArray(parsed) ? parsed : parsed.earned;
     const valid = new Set(doc.trophies.map((t) => t.id));
     state.earned = new Set(ids.filter((id) => valid.has(id)));
+    if (parsed && typeof parsed.counters === 'object' && parsed.counters !== null) {
+      state.counters = clampCounters(parsed.counters);
+    }
     saveProgress();
     render();
   } catch {
@@ -146,5 +204,8 @@ document.querySelector('#import-file').addEventListener('change', async (e) => {
 });
 
 document.querySelector('#missable-rule').textContent = doc.missableRule;
+document.querySelector('#footer-sources').textContent =
+  doc.sources.map((s) => `[${s.n}] ${s.name} (${s.url})`).join(' · ') +
+  '. Every guide is written for this page in its own words, and the citation numbers beside each step name the sources that step rests on.';
 render();
 window.__shotReady = true;
